@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { interviewData } from './data';
-import { Menu, X, BookOpen, ChevronLeft, Lightbulb, Target, Shield, Users, Award, CheckCircle, HelpCircle, MessageSquare } from 'lucide-react';
+import { Menu, X, BookOpen, Lightbulb, Target, Shield, Users, Award, CheckCircle, HelpCircle, MessageSquare, Trash2, Copy, Check } from 'lucide-react';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('intro');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const navItems = [
     { id: 'intro', title: 'المشهد الافتتاحي', icon: <MessageSquare className="w-5 h-5" /> },
@@ -31,6 +33,20 @@ export default function App() {
     return icons[index % icons.length];
   }
 
+  const handleCopyText = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleClearNotes = (sectionId: string) => {
+    setNotes(prev => ({ ...prev, [sectionId]: '' }));
+  };
+
+  const handleNoteChange = (sectionId: string, value: string) => {
+    setNotes(prev => ({ ...prev, [sectionId]: value }));
+  };
+
   const renderContent = () => {
     if (activeSection === 'intro') {
       return (
@@ -46,12 +62,18 @@ export default function App() {
               ))}
             </div>
           </div>
+          <NotesSection
+            sectionId="intro"
+            notes={notes['intro'] || ''}
+            onClear={() => handleClearNotes('intro')}
+            onChange={(value) => handleNoteChange('intro', value)}
+          />
         </div>
       );
     }
 
     if (activeSection === 'path1') {
-      return <SectionView data={interviewData.path1} />;
+      return <SectionView data={interviewData.path1} sectionId="path1" notes={notes['path1'] || ''} onNoteChange={(value) => handleNoteChange('path1', value)} onClearNotes={() => handleClearNotes('path1')} onCopy={handleCopyText} copiedId={copiedId} />;
     }
 
     if (activeSection === 'path2Intro') {
@@ -68,6 +90,12 @@ export default function App() {
               ))}
             </div>
           </div>
+          <NotesSection
+            sectionId="path2Intro"
+            notes={notes['path2Intro'] || ''}
+            onClear={() => handleClearNotes('path2Intro')}
+            onChange={(value) => handleNoteChange('path2Intro', value)}
+          />
         </div>
       );
     }
@@ -79,24 +107,30 @@ export default function App() {
             <h1 className="text-3xl font-bold text-slate-800 mb-6">{interviewData.conclusion.title}</h1>
             <div className="space-y-6">
               {interviewData.conclusion.questions.map((q) => (
-                <QuestionCard key={q.id} question={q} />
+                <QuestionCard key={q.id} question={q} onCopy={handleCopyText} copiedId={copiedId} />
               ))}
             </div>
           </div>
+          <NotesSection
+            sectionId="conclusion"
+            notes={notes['conclusion'] || ''}
+            onClear={() => handleClearNotes('conclusion')}
+            onChange={(value) => handleNoteChange('conclusion', value)}
+          />
         </div>
       );
     }
 
     const stageData = interviewData.path2Stages.find(s => s.id === activeSection);
     if (stageData) {
-      return <SectionView data={stageData} isPath2 />;
+      return <SectionView data={stageData} isPath2 sectionId={stageData.id} notes={notes[stageData.id] || ''} onNoteChange={(value) => handleNoteChange(stageData.id, value)} onClearNotes={() => handleClearNotes(stageData.id)} onCopy={handleCopyText} copiedId={copiedId} />;
     }
 
     return null;
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen flex bg-slate-50 text-slate-900" style={{ fontFamily: '"IBM Plex Sans Arabic", sans-serif' }}>
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50 flex items-center justify-between px-4">
         <h1 className="font-bold text-lg text-slate-800">دليل المقابلة</h1>
@@ -154,7 +188,7 @@ export default function App() {
   );
 }
 
-function SectionView({ data, isPath2 = false }: { data: any, isPath2?: boolean }) {
+function SectionView({ data, isPath2 = false, sectionId, notes, onNoteChange, onClearNotes, onCopy, copiedId }: { data: any, isPath2?: boolean, sectionId: string, notes: string, onNoteChange: (value: string) => void, onClearNotes: () => void, onCopy: (text: string, id: string) => void, copiedId: string | null }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
@@ -190,20 +224,41 @@ function SectionView({ data, isPath2 = false }: { data: any, isPath2?: boolean }
             أسئلة المقابلة
           </h3>
           {data.questions.map((q: any) => (
-            <QuestionCard key={q.id} question={q} />
+            <QuestionCard key={q.id} question={q} onCopy={onCopy} copiedId={copiedId} />
           ))}
         </div>
       </div>
+      <NotesSection
+        sectionId={sectionId}
+        notes={notes}
+        onClear={onClearNotes}
+        onChange={onNoteChange}
+      />
     </div>
   );
 }
 
-function QuestionCard({ question }: { question: any }) {
+function QuestionCard({ question, onCopy, copiedId }: { question: any, onCopy: (text: string, id: string) => void, copiedId: string | null }) {
+  const fullText = `${question.title}\n${question.text}${question.hint ? `\n\nتوضيح إضافي: ${question.hint}` : ''}`;
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 hover:border-indigo-300 transition-colors duration-200 shadow-sm hover:shadow-md">
-      <h4 className="text-lg font-bold text-slate-800 mb-3">{question.title}</h4>
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <h4 className="text-lg font-bold text-slate-800">{question.title}</h4>
+        <button
+          onClick={() => onCopy(fullText, question.id)}
+          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+          title="نسخ السؤال"
+        >
+          {copiedId === question.id ? (
+            <Check className="w-5 h-5 text-green-500" />
+          ) : (
+            <Copy className="w-5 h-5" />
+          )}
+        </button>
+      </div>
       <p className="text-slate-700 text-lg leading-relaxed mb-4">{question.text}</p>
-      
+
       {question.hint && (
         <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 mt-4">
           <p className="text-sm text-amber-800 leading-relaxed flex items-start gap-2">
@@ -212,6 +267,35 @@ function QuestionCard({ question }: { question: any }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function NotesSection({ sectionId, notes, onClear, onChange }: { sectionId: string, notes: string, onClear: () => void, onChange: (value: string) => void }) {
+  return (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <BookOpen className="w-5 h-5 text-indigo-500" />
+          ملاحظاتك
+        </h3>
+        {notes && (
+          <button
+            onClick={onClear}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            مسح الملاحظات
+          </button>
+        )}
+      </div>
+      <textarea
+        value={notes}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="اكتب ملاحظاتك هنا..."
+        className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-700 placeholder-slate-400"
+        dir="rtl"
+      />
     </div>
   );
 }
